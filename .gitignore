@@ -1,0 +1,12 @@
+__pycache__/
+.ipynb_checkpoints/
+exp_local
+exp
+exp_fixed
+exp_hard
+nbs
+code_snapshots
+exp_drqv2_*.py
+dmc_benchmarks.py
+check_sweep.py
+cancel_sweep.py
