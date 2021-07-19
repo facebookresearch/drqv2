@@ -1,5 +1,5 @@
 defaults:
-  - hydra/launcher: submitit_local
+  - override hydra/launcher: submitit_local
 
 # task settings
 task: quadruped_walk
