@@ -51,7 +51,7 @@ If you use this repo in your research, please consider citing the paper as follo
   year={2021}
 }
 ```
-Also, you might want to cite our original paper:
+Please also cite our original paper:
 ```
 @inproceedings{yarats2021image,
   title={Image Augmentation Is All You Need: Regularizing Deep Reinforcement Learning from Pixels},
