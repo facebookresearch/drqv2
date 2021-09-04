@@ -1,0 +1,16 @@
+experiment: exp
+
+agent:
+  _target_: drqv2.DrQV2Agent
+  obs_shape: ??? # to be specified later
+  action_shape: ??? # to be specified later
+  device: ${device}
+  lr: ${env_cfg.lr}
+  critic_target_tau: 0.01
+  update_every_steps: 2
+  use_tb: ${use_tb}
+  num_expl_steps: 2000
+  hidden_dim: 1024
+  feature_dim: ${env_cfg.feature_dim}
+  stddev_schedule: ${env_cfg.stddev_schedule}
+  stddev_clip: 0.3

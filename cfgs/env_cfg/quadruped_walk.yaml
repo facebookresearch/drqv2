@@ -1,0 +1,20 @@
+# task settings
+task: quadruped_walk
+frame_stack: 3
+action_repeat: 2
+discount: 0.99
+# train settings
+num_train_frames: 3100000
+num_seed_frames: 4000
+# eval
+eval_every_frames: 10000
+num_eval_episodes: 10
+# replay buffer
+replay_buffer_size: 1000000
+replay_buffer_num_workers: 4
+nstep: 3
+batch_size: 256
+# agent
+lr: 1e-4
+feature_dim: 50
+stddev_schedule: 'linear(1.0,0.1,500000)'
