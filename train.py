@@ -42,7 +42,8 @@ class Workspace:
         self.setup()
 
         self.agent = make_agent(self.train_env.observation_spec(),
-                                self.train_env.action_spec(), cfg.agent)
+                                self.train_env.action_spec(),
+                                self.cfg.agent)
         self.timer = utils.Timer()
         self._global_step = 0
         self._global_episode = 0
@@ -51,9 +52,9 @@ class Workspace:
         # create logger
         self.logger = Logger(self.work_dir, use_tb=self.cfg.use_tb)
         # create envs
-        self.train_env = dmc.make(self.cfg.task, self.cfg.frame_stack,
+        self.train_env = dmc.make(self.cfg.task_name, self.cfg.frame_stack,
                                   self.cfg.action_repeat, self.cfg.seed)
-        self.eval_env = dmc.make(self.cfg.task, self.cfg.frame_stack,
+        self.eval_env = dmc.make(self.cfg.task_name, self.cfg.frame_stack,
                                  self.cfg.action_repeat, self.cfg.seed)
         # create replay buffer
         data_specs = (self.train_env.observation_spec(),
@@ -74,6 +75,7 @@ class Workspace:
             self.work_dir if self.cfg.save_video else None)
         self.train_video_recorder = TrainVideoRecorder(
             self.work_dir if self.cfg.save_train_video else None)
+
 
     @property
     def global_step(self):
@@ -202,7 +204,7 @@ class Workspace:
             self.__dict__[k] = v
 
 
-@hydra.main(config_path='.', config_name='config')
+@hydra.main(config_path='cfgs', config_name='config')
 def main(cfg):
     from train import Workspace as W
     root_dir = Path.cwd()
