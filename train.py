@@ -43,7 +43,7 @@ class Workspace:
 
         self.agent = make_agent(self.train_env.observation_spec(),
                                 self.train_env.action_spec(),
-                                self.agent_cfg.agent)
+                                self.cfg.agent)
         self.timer = utils.Timer()
         self._global_step = 0
         self._global_episode = 0
@@ -52,10 +52,10 @@ class Workspace:
         # create logger
         self.logger = Logger(self.work_dir, use_tb=self.cfg.use_tb)
         # create envs
-        self.train_env = dmc.make(self.env_cfg.task, self.env_cfg.frame_stack,
-                                  self.env_cfg.action_repeat, self.cfg.seed)
-        self.eval_env = dmc.make(self.env_cfg.task, self.env_cfg.frame_stack,
-                                 self.env_cfg.action_repeat, self.cfg.seed)
+        self.train_env = dmc.make(self.cfg.task_name, self.cfg.frame_stack,
+                                  self.cfg.action_repeat, self.cfg.seed)
+        self.eval_env = dmc.make(self.cfg.task_name, self.cfg.frame_stack,
+                                 self.cfg.action_repeat, self.cfg.seed)
         # create replay buffer
         data_specs = (self.train_env.observation_spec(),
                       self.train_env.action_spec(),
@@ -66,9 +66,9 @@ class Workspace:
                                                   self.work_dir / 'buffer')
 
         self.replay_loader = make_replay_loader(
-            self.work_dir / 'buffer', self.env_cfg.replay_buffer_size,
-            self.env_cfg.batch_size, self.env_cfg.replay_buffer_num_workers,
-            self.cfg.save_snapshot, self.env_cfg.nstep, self.env_cfg.discount)
+            self.work_dir / 'buffer', self.cfg.replay_buffer_size,
+            self.cfg.batch_size, self.cfg.replay_buffer_num_workers,
+            self.cfg.save_snapshot, self.cfg.nstep, self.cfg.discount)
         self._replay_iter = None
 
         self.video_recorder = VideoRecorder(
@@ -76,13 +76,6 @@ class Workspace:
         self.train_video_recorder = TrainVideoRecorder(
             self.work_dir if self.cfg.save_train_video else None)
 
-    @property
-    def env_cfg(self):
-        return self.cfg.env_cfg
-
-    @property
-    def agent_cfg(self):
-        return self.cfg.agent_cfg
 
     @property
     def global_step(self):
@@ -94,7 +87,7 @@ class Workspace:
 
     @property
     def global_frame(self):
-        return self.global_step * self.env_cfg.action_repeat
+        return self.global_step * self.cfg.action_repeat
 
     @property
     def replay_iter(self):
@@ -104,7 +97,7 @@ class Workspace:
 
     def eval(self):
         step, episode, total_reward = 0, 0, 0
-        eval_until_episode = utils.Until(self.env_cfg.num_eval_episodes)
+        eval_until_episode = utils.Until(self.cfg.num_eval_episodes)
 
         while eval_until_episode(episode):
             time_step = self.eval_env.reset()
@@ -124,18 +117,18 @@ class Workspace:
 
         with self.logger.log_and_dump_ctx(self.global_frame, ty='eval') as log:
             log('episode_reward', total_reward / episode)
-            log('episode_length', step * self.env_cfg.action_repeat / episode)
+            log('episode_length', step * self.cfg.action_repeat / episode)
             log('episode', self.global_episode)
             log('step', self.global_step)
 
     def train(self):
         # predicates
-        train_until_step = utils.Until(self.env_cfg.num_train_frames,
-                                       self.env_cfg.action_repeat)
-        seed_until_step = utils.Until(self.env_cfg.num_seed_frames,
-                                      self.env_cfg.action_repeat)
-        eval_every_step = utils.Every(self.env_cfg.eval_every_frames,
-                                      self.env_cfg.action_repeat)
+        train_until_step = utils.Until(self.cfg.num_train_frames,
+                                       self.cfg.action_repeat)
+        seed_until_step = utils.Until(self.cfg.num_seed_frames,
+                                      self.cfg.action_repeat)
+        eval_every_step = utils.Every(self.cfg.eval_every_frames,
+                                      self.cfg.action_repeat)
 
         episode_step, episode_reward = 0, 0
         time_step = self.train_env.reset()
@@ -150,7 +143,7 @@ class Workspace:
                 if metrics is not None:
                     # log stats
                     elapsed_time, total_time = self.timer.reset()
-                    episode_frame = episode_step * self.env_cfg.action_repeat
+                    episode_frame = episode_step * self.cfg.action_repeat
                     with self.logger.log_and_dump_ctx(self.global_frame,
                                                       ty='train') as log:
                         log('fps', episode_frame / elapsed_time)

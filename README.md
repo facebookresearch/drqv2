@@ -72,7 +72,7 @@ conda activate drqv2
 
 Train the agent:
 ```sh
-python train.py env_cfg=quadruped_walk
+python train.py task=quadruped_walk
 ```
 
 Monitor results:
