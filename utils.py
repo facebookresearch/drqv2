@@ -49,6 +49,70 @@ def to_torch(xs, device):
     return tuple(torch.as_tensor(x, device=device) for x in xs)
 
 
+class DenseParallel(nn.Module):
+    def __init__(self, in_features: int, out_features: int, n_parallel: int,
+                 bias: bool = True, device=None, dtype=None) -> None:
+        factory_kwargs = {'device': device, 'dtype': dtype}
+        super(DenseParallel, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.n_parallel = n_parallel
+        self.weight = nn.Parameter(torch.empty((n_parallel, in_features, out_features), **factory_kwargs))
+        if bias:
+            self.bias = nn.Parameter(torch.empty((n_parallel, 1, out_features), **factory_kwargs))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        nn.init.kaiming_uniform_(self.weight, a=np.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / np.sqrt(fan_in) if fan_in > 0 else 0
+            nn.init.uniform_(self.bias, -bound, bound)
+
+    def forward(self, input):
+        return torch.matmul(input, self.weight) + self.bias
+
+    def extra_repr(self) -> str:
+        return 'in_features={}, out_features={}, n_parallel={}, bias={}'.format(
+            self.in_features, self.out_features, self.n_parallel, self.bias is not None
+        )
+
+
+def parallel_orthogonal_(tensor, gain=1):
+    if tensor.ndimension() < 3:
+        raise ValueError("Only tensors with 3 or more dimensions are supported")
+
+    n_parallel = tensor.size(0)
+    rows = tensor.size(1)
+    cols = tensor.numel() // n_parallel // rows
+    flattened = tensor.new(n_parallel, rows, cols).normal_(0, 1)
+
+    qs = []
+    for flat_tensor in torch.unbind(flattened, dim=0):
+        if rows < cols:
+            flat_tensor.t_()
+
+        # Compute the qr factorization
+        q, r = torch.linalg.qr(flat_tensor)
+        # Make Q uniform according to https://arxiv.org/pdf/math-ph/0609050.pdf
+        d = torch.diag(r, 0)
+        ph = d.sign()
+        q *= ph
+
+        if rows < cols:
+            q.t_()
+        qs.append(q)
+
+    qs = torch.stack(qs, dim=0)
+
+    with torch.no_grad():
+        tensor.view_as(qs).copy_(qs)
+        tensor.mul_(gain)
+    return tensor
+
+
 def weight_init(m):
     if isinstance(m, nn.Linear):
         nn.init.orthogonal_(m.weight.data)
@@ -57,6 +121,11 @@ def weight_init(m):
     elif isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
         gain = nn.init.calculate_gain('relu')
         nn.init.orthogonal_(m.weight.data, gain)
+        if hasattr(m.bias, 'data'):
+            m.bias.data.fill_(0.0)
+    elif isinstance(m, DenseParallel):
+        gain = nn.init.calculate_gain('relu')
+        parallel_orthogonal_(m.weight.data, gain)
         if hasattr(m.bias, 'data'):
             m.bias.data.fill_(0.0)
 

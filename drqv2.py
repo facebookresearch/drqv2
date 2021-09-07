@@ -100,25 +100,21 @@ class Critic(nn.Module):
         self.trunk = nn.Sequential(nn.Linear(repr_dim, feature_dim),
                                    nn.LayerNorm(feature_dim), nn.Tanh())
 
-        self.Q1 = nn.Sequential(
-            nn.Linear(feature_dim + action_shape[0], hidden_dim),
-            nn.ReLU(inplace=True), nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(inplace=True), nn.Linear(hidden_dim, 1))
-
-        self.Q2 = nn.Sequential(
-            nn.Linear(feature_dim + action_shape[0], hidden_dim),
-            nn.ReLU(inplace=True), nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(inplace=True), nn.Linear(hidden_dim, 1))
+        self.QS = nn.Sequential(
+            utils.DenseParallel(feature_dim + action_shape[0], hidden_dim, 2),
+            nn.ReLU(inplace=True),
+            utils.DenseParallel(hidden_dim, hidden_dim, 2),
+            nn.ReLU(inplace=True),
+            utils.DenseParallel(hidden_dim, 1, 2))
 
         self.apply(utils.weight_init)
 
     def forward(self, obs, action):
         h = self.trunk(obs)
         h_action = torch.cat([h, action], dim=-1)
-        q1 = self.Q1(h_action)
-        q2 = self.Q2(h_action)
+        qs = self.QS(h_action)
 
-        return q1, q2
+        return torch.squeeze(torch.transpose(qs, 0, 1), dim=-1)
 
 
 class DrQV2Agent:
@@ -181,17 +177,17 @@ class DrQV2Agent:
             stddev = utils.schedule(self.stddev_schedule, step)
             dist = self.actor(next_obs, stddev)
             next_action = dist.sample(clip=self.stddev_clip)
-            target_Q1, target_Q2 = self.critic_target(next_obs, next_action)
-            target_V = torch.min(target_Q1, target_Q2)
+            target_QS = self.critic_target(next_obs, next_action)
+            target_V = target_QS.amin(dim=1, keepdim=True)
             target_Q = reward + (discount * target_V)
 
-        Q1, Q2 = self.critic(obs, action)
-        critic_loss = F.mse_loss(Q1, target_Q) + F.mse_loss(Q2, target_Q)
+        QS = self.critic(obs, action)
+        critic_loss = (QS - target_Q).square().sum(1).mean()
 
         if self.use_tb:
             metrics['critic_target_q'] = target_Q.mean().item()
-            metrics['critic_q1'] = Q1.mean().item()
-            metrics['critic_q2'] = Q2.mean().item()
+            metrics['critic_q1'] = QS[..., 0].mean().item()
+            metrics['critic_q2'] = QS[..., 1].mean().item()
             metrics['critic_loss'] = critic_loss.item()
 
         # optimize encoder and critic
@@ -210,8 +206,8 @@ class DrQV2Agent:
         dist = self.actor(obs, stddev)
         action = dist.sample(clip=self.stddev_clip)
         log_prob = dist.log_prob(action).sum(-1, keepdim=True)
-        Q1, Q2 = self.critic(obs, action)
-        Q = torch.min(Q1, Q2)
+        QS = self.critic(obs, action)
+        Q = QS.amin(dim=1)
 
         actor_loss = -Q.mean()
 
