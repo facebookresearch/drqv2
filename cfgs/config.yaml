@@ -1,5 +1,6 @@
 defaults:
   - _self_
+  - replay_buffer@_global_: numpy
   - task@_global_: quadruped_walk
   - override hydra/launcher: submitit_local
 

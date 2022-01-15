@@ -1,0 +1,8 @@
+replay_buffer:
+  _target_: dataloader_replay_buffer.DataloaderReplayBuffer
+  buffer_size: ${replay_buffer_size}
+  batch_size: ${batch_size}
+  nstep: ${nstep}
+  discount: ${discount}
+  save_snapshot: ${save_snapshot}
+  num_workers: 4
