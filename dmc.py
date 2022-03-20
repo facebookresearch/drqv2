@@ -29,7 +29,10 @@ class ExtendedTimeStep(NamedTuple):
         return self.step_type == StepType.LAST
 
     def __getitem__(self, attr):
-        return getattr(self, attr)
+        if isinstance(attr, str):
+            return getattr(self, attr)
+        else:
+            return tuple.__getitem__(self, attr)
 
 
 class ActionRepeatWrapper(dm_env.Environment):
